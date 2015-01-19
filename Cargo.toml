@@ -1,0 +1,5 @@
+[package]
+
+name = "rude"
+version = "0.0.1"
+authors = ["Pepe Barbe <pepe@appfirst.com>"]
