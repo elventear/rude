@@ -88,8 +88,55 @@ fn count_utf8(cs: &mut CharStats, chars: &[u8], i: usize) {
     }
 }
 
-fn count_utf16(cs: &mut CharStats, chars: &[u8], i: usize) {
+fn count_utf16_le(cs: &mut CharStats, chars: &[u8], i: usize) {
+    use encoding::all::UTF_16LE;
+
+    let prev : Option<String> = match i {
+        x if x < 2 => None,
+        x if x < chars.len() => match UTF_16LE.decode(&chars[i-2..i], DecoderTrap::Strict) {
+            Result::Ok(s) => Some(s),
+            Result::Err(..) => None
+        },
+        _ => None
+    };
+
+    let curr : Option<String> = match i {
+        x if (2 <= x) && (x < chars.len()-2) => 
+            match UTF_16LE.decode(&chars[i..i+2], DecoderTrap::Strict) {
+                Result::Ok(s) => Some(s),
+                Result::Err(..) => None
+        },
+        _ => None
+    };
+
+    let next : Option<String> = match i {
+        x if x < chars.len()-2 => match UTF_16LE.decode(&chars[i+2..i+4], DecoderTrap::Strict) {
+            Result::Ok(s) => Some(s),
+            Result::Err(..) => None
+        },
+        _ => None
+    };
+
+    match (prev, curr, next) {
+        (Some(p), Some(c), Some(n)) => {
+            count(&mut cs.utf16le, &p, &c, &n);
+        },
+        _ => ()
+    }
+}
+
+fn count_utf16_be(cs: &mut CharStats, chars: &[u8], i: usize) {
     ()
+}
+
+fn count_utf16(cs: &mut CharStats, chars: &[u8], i: usize) {
+    match i {
+        x if x % 2 == 0 => {
+            count_utf16_le(cs, chars, i);
+            count_utf16_be(cs, chars, i);
+        },
+        _ => ()
+    }
 }
 
 fn count_utf32(cs: &mut CharStats, chars: &[u8], i: usize) {
@@ -121,9 +168,21 @@ mod tests {
         assert!(cc.tot == tot);
     }
 
-    fn to_utf8_bytes(s: &str) -> &[u8] 
+    fn to_utf8_bytes(s: &str) -> Vec<u8>
     {
-        s.as_bytes()
+        s.as_bytes().iter().map(|&x| x).collect::<Vec<u8>>()
+    }
+
+    fn to_utf16le_bytes(s: &str) -> Vec<u8>
+    {
+        let mut o : Vec<u8> = vec![];
+
+        for b in s.as_bytes().iter() {
+            o.push(*b);
+            o.push(0);
+        }
+
+        o
     }
 
     #[allow(unstable)]
@@ -145,7 +204,7 @@ mod tests {
     fn test_count_utf8() {
         use super::count_utf8;
         
-        let chars: &[u8] = to_utf8_bytes(" a \nb\n");
+        let chars : &[u8]   = &to_utf8_bytes(" a \nb\n")[0..]; 
 
         let cs = & mut CharStats::new();
         assert_char_counts(&cs.utf8, 0, 0, 0);
@@ -167,6 +226,49 @@ mod tests {
 
         count_utf8(cs, chars, 5); // edge \n
         assert_char_counts(&cs.utf8, 1, 1, 4);
+    }
+
+    #[test]
+    fn test_count_utf16le() {
+        use super::count_utf16;
+        
+        let chars : &[u8]   = &to_utf16le_bytes(" a \nb\n")[0..]; 
+
+        let cs = & mut CharStats::new();
+        assert_char_counts(&cs.utf16le, 0, 0, 0);
+        assert_char_counts(&cs.utf16be, 0, 0, 0);
+
+        count_utf16(cs, chars, 0); // edge space
+        assert_char_counts(&cs.utf16le, 0, 0, 0);
+        assert_char_counts(&cs.utf16be, 0, 0, 0);
+
+        count_utf16(cs, chars, 2); // a
+        assert_char_counts(&cs.utf16le, 0, 0, 1);
+        assert_char_counts(&cs.utf16be, 0, 0, 0);
+
+        count_utf16(cs, chars, 3); // invalid utf-16 position
+        assert_char_counts(&cs.utf16le, 0, 0, 1);
+        assert_char_counts(&cs.utf16be, 0, 0, 0);
+
+        count_utf16(cs, chars, 4); // space 
+        assert_char_counts(&cs.utf16le, 1, 0, 2);
+        assert_char_counts(&cs.utf16be, 0, 0, 0);
+
+        count_utf16(cs, chars, 5); // invalid utf-16 position 
+        assert_char_counts(&cs.utf16le, 1, 0, 2);
+        assert_char_counts(&cs.utf16be, 0, 0, 0);
+
+        count_utf16(cs, chars, 6); // \n 
+        assert_char_counts(&cs.utf16le, 1, 1, 3);
+        assert_char_counts(&cs.utf16be, 0, 0, 0);
+
+        count_utf16(cs, chars, 8); // b
+        assert_char_counts(&cs.utf16le, 1, 1, 4);
+        assert_char_counts(&cs.utf16be, 0, 0, 0);
+
+        count_utf16(cs, chars, 10); // edge \n
+        assert_char_counts(&cs.utf16le, 1, 1, 4);
+        assert_char_counts(&cs.utf16be, 0, 0, 0);
     }
 }
 
