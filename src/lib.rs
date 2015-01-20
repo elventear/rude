@@ -88,21 +88,22 @@ fn count_utf8(cs: &mut CharStats, chars: &[u8], i: usize) {
     }
 }
 
-fn count_utf16_le(cs: &mut CharStats, chars: &[u8], i: usize) {
-    use encoding::all::UTF_16LE;
+fn _count_utf16(cc: &mut CharCounts, chars: &[u8], i: usize, decoder: &Encoding) {
+    use encoding::types::Encoding;
 
     let prev : Option<String> = match i {
         x if x < 2 => None,
-        x if x < chars.len() => match UTF_16LE.decode(&chars[i-2..i], DecoderTrap::Strict) {
-            Result::Ok(s) => Some(s),
-            Result::Err(..) => None
+        x if x < chars.len() => 
+            match decoder.decode(&chars[i-2..i], DecoderTrap::Strict) {
+                Result::Ok(s) => Some(s),
+                Result::Err(..) => None
         },
         _ => None
     };
 
     let curr : Option<String> = match i {
         x if (2 <= x) && (x < chars.len()-2) => 
-            match UTF_16LE.decode(&chars[i..i+2], DecoderTrap::Strict) {
+            match decoder.decode(&chars[i..i+2], DecoderTrap::Strict) {
                 Result::Ok(s) => Some(s),
                 Result::Err(..) => None
         },
@@ -110,30 +111,30 @@ fn count_utf16_le(cs: &mut CharStats, chars: &[u8], i: usize) {
     };
 
     let next : Option<String> = match i {
-        x if x < chars.len()-2 => match UTF_16LE.decode(&chars[i+2..i+4], DecoderTrap::Strict) {
-            Result::Ok(s) => Some(s),
-            Result::Err(..) => None
+        x if x < chars.len()-2 => 
+            match decoder.decode(&chars[i+2..i+4], DecoderTrap::Strict) {
+                Result::Ok(s) => Some(s),
+                Result::Err(..) => None
         },
         _ => None
     };
 
     match (prev, curr, next) {
         (Some(p), Some(c), Some(n)) => {
-            count(&mut cs.utf16le, &p, &c, &n);
+            count(cc, &p, &c, &n);
         },
         _ => ()
     }
 }
 
-fn count_utf16_be(cs: &mut CharStats, chars: &[u8], i: usize) {
-    ()
-}
-
 fn count_utf16(cs: &mut CharStats, chars: &[u8], i: usize) {
+    use encoding::all::UTF_16LE;
+    use encoding::all::UTF_16BE;
+    
     match i {
         x if x % 2 == 0 => {
-            count_utf16_le(cs, chars, i);
-            count_utf16_be(cs, chars, i);
+            _count_utf16(&mut cs.utf16le, chars, i, UTF_16LE);
+            _count_utf16(&mut cs.utf16be, chars, i, UTF_16BE);
         },
         _ => ()
     }
@@ -236,39 +237,30 @@ mod tests {
 
         let cs = & mut CharStats::new();
         assert_char_counts(&cs.utf16le, 0, 0, 0);
-        assert_char_counts(&cs.utf16be, 0, 0, 0);
 
         count_utf16(cs, chars, 0); // edge space
         assert_char_counts(&cs.utf16le, 0, 0, 0);
-        assert_char_counts(&cs.utf16be, 0, 0, 0);
 
         count_utf16(cs, chars, 2); // a
         assert_char_counts(&cs.utf16le, 0, 0, 1);
-        assert_char_counts(&cs.utf16be, 0, 0, 0);
 
         count_utf16(cs, chars, 3); // invalid utf-16 position
         assert_char_counts(&cs.utf16le, 0, 0, 1);
-        assert_char_counts(&cs.utf16be, 0, 0, 0);
 
         count_utf16(cs, chars, 4); // space 
         assert_char_counts(&cs.utf16le, 1, 0, 2);
-        assert_char_counts(&cs.utf16be, 0, 0, 0);
 
         count_utf16(cs, chars, 5); // invalid utf-16 position 
         assert_char_counts(&cs.utf16le, 1, 0, 2);
-        assert_char_counts(&cs.utf16be, 0, 0, 0);
 
         count_utf16(cs, chars, 6); // \n 
         assert_char_counts(&cs.utf16le, 1, 1, 3);
-        assert_char_counts(&cs.utf16be, 0, 0, 0);
 
         count_utf16(cs, chars, 8); // b
         assert_char_counts(&cs.utf16le, 1, 1, 4);
-        assert_char_counts(&cs.utf16be, 0, 0, 0);
 
         count_utf16(cs, chars, 10); // edge \n
         assert_char_counts(&cs.utf16le, 1, 1, 4);
-        assert_char_counts(&cs.utf16be, 0, 0, 0);
     }
 }
 
