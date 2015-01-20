@@ -2,4 +2,8 @@
 
 name = "rude"
 version = "0.0.1"
-authors = ["Pepe Barbe <pepe@appfirst.com>"]
+authors = ["Pepe Barbe <dev@antropoide.net>"]
+
+[dependencies]
+
+encoding = "0.2.18"
