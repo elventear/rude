@@ -148,6 +148,18 @@ mod tests {
 
         o
     }
+    
+    fn to_utf16be_bytes(s: &str) -> Vec<u8>
+    {
+        let mut o : Vec<u8> = vec![];
+
+        for b in s.as_bytes().iter() {
+            o.push(0);
+            o.push(*b);
+        }
+
+        o
+    }
 
     #[allow(unstable)]
     #[test]
@@ -222,8 +234,42 @@ mod tests {
         count_utf16(cs, chars, 8); // b
         assert_char_counts(&cs.utf16le, 1, 1, 4);
 
-        //count_utf16(cs, chars, 10); // edge \n
-        //assert_char_counts(&cs.utf16le, 1, 1, 4);
+        count_utf16(cs, chars, 10); // edge \n
+        assert_char_counts(&cs.utf16le, 1, 1, 4);
+    }
+
+    #[test]
+    fn test_count_utf16be() {
+        use super::count_utf16;
+        
+        let chars : &[u8]   = &to_utf16be_bytes(" a \nb\n")[0..]; 
+
+        let cs = & mut CharStats::new();
+        assert_char_counts(&cs.utf16be, 0, 0, 0);
+
+        count_utf16(cs, chars, 0); // edge space
+        assert_char_counts(&cs.utf16be, 0, 0, 0);
+
+        count_utf16(cs, chars, 2); // a
+        assert_char_counts(&cs.utf16be, 0, 0, 1);
+
+        count_utf16(cs, chars, 3); // invalid utf-16 position
+        assert_char_counts(&cs.utf16be, 0, 0, 1);
+
+        count_utf16(cs, chars, 4); // space 
+        assert_char_counts(&cs.utf16be, 1, 0, 2);
+
+        count_utf16(cs, chars, 5); // invalid utf-16 position 
+        assert_char_counts(&cs.utf16be, 1, 0, 2);
+
+        count_utf16(cs, chars, 6); // \n 
+        assert_char_counts(&cs.utf16be, 1, 1, 3);
+
+        count_utf16(cs, chars, 8); // b
+        assert_char_counts(&cs.utf16be, 1, 1, 4);
+
+        count_utf16(cs, chars, 10); // edge \n
+        assert_char_counts(&cs.utf16be, 1, 1, 4);
     }
 }
 
